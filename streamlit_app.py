@@ -1,60 +1,49 @@
-import streamlit as st
-import pandas as pd
+import datetime
 
-# إعدادات الفخامة والاسم العام
-st.set_page_config(page_title="Pro Data Matrix", layout="wide")
+def handler(pd: "pipedream"):
+    # 1. سحب البيانات من الرابط
+    query = pd.steps.get("trigger", {}).get("event", {}).get("query", {})
+    
+    name = query.get("name") or "Unknown"
+    phone = query.get("phone") or ""
+    budget = query.get("budget") or "N/A"
+    region = query.get("region") or "N/A"
+    
+    # 2. صناعة رابط الواتساب الأنيق
+    if phone:
+        # تنظيف الرقم من أي علامات زائد أو فراغات
+        clean_phone = str(phone).replace("+", "").replace(" ", "")
+        wa_url = f"https://wa.me/{clean_phone}?text=Hello%20{name}"
+        whatsapp_display = f'=HYPERLINK("{wa_url}", "Chat Now 💬")'
+    else:
+        whatsapp_display = "No Number"
+    
+    # 3. التحليل الذكي (عربي احترافي)
+    budget_clean = str(budget).upper()
+    if any(x in budget_clean for x in ["M", "MILLION", "مليون"]):
+        analysis = f"💎 لقطة استثمارية! ميزانية ضخمة في {region}."
+        quality = "VIP"
+    elif any(x in budget_clean for x in ["K", "THOUSAND", "الف"]):
+        analysis = f"✅ زبون جاد بميزانية متوسطة في {region}."
+        quality = "Serious"
+    else:
+        analysis = f"⚠️ مهتم بـ {region}، يحتاج تدقيق ميزانية."
+        quality = "Follow-up"
 
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .property-card {
-        background-color: #1a1c24;
-        border-radius: 15px;
-        padding: 20px;
-        border: 1px solid #d4af37;
-        margin-bottom: 20px;
+    # 4. توقيت بغداد بنظام 12 ساعة (السنة-الشهر-اليوم الساعة:الدقيقة AM/PM)
+    # إضافة 3 ساعات لتوقيت UTC ليطابق توقيت العراق
+    # %I تعني نظام 12 ساعة، %p تعني صباحاً أو مساءً
+    iraq_time = (datetime.datetime.utcnow() + datetime.timedelta(hours=3)).strftime("%Y-%m-%d %I:%M %p")
+
+    # 5. المخرجات النهائية (يجب أن تطابق أسماء الأعمدة في Google Sheets)
+    return {
+        "Customer_Name": name,
+        "Phone_Number": phone,
+        "WhatsApp_Link": whatsapp_display,
+        "Budget_Range": budget,
+        "Target_Region": region,
+        "Ai_Analysis": analysis,
+        "Lead_Quality": quality,
+        "Submission_Date": iraq_time
     }
-    .vip-badge {
-        background: #d4af37;
-        color: black;
-        padding: 2px 10px;
-        border-radius: 10px;
-        font-weight: bold;
-    }
-    .date-text {
-        color: #888888 !important;
-        font-size: 0.85em;
-    }
-    h2, p { color: white !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# رابط البيانات
-SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-
-st.markdown("<h1 style='text-align: center; color: #d4af37;'>📊 Pro Data Matrix Engine</h1>", unsafe_allow_html=True)
-
-try:
-    df = pd.read_csv(CSV_URL)
-    for _, row in df.iterrows():
-        with st.container():
-            st.markdown(f"""
-            <div class="property-card">
-                <span class="vip-badge">💎 {row['Lead_Quality']}</span>
-                <h2>👤 {row['Customer_Name']}</h2>
-                <p>📍 المنطقة: {row['Target_Region']}</p>
-                <p style="color: #2ecc71 !important;">💰 الميزانية: {row['Budget_Range']}</p>
-                <p class="date-text">📅 تاريخ التسجيل: {row['Submission_Date']}</p>
-                <div style="background-color: #2c3e50; padding: 15px; border-radius: 10px;">
-                    <p>🤖 <b>التحليل الذكي:</b><br>{row['Ai_Analysis']}</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # زر الواتساب الاحترافي
-            st.link_button(f"تواصل مع {row['Customer_Name']} 💬", f"https://wa.me/{row['Phone_Number']}", use_container_width=True)
-            st.markdown("<br>", unsafe_allow_html=True)
-except Exception as e:
-    st.error("فشل في قراءة البيانات، تأكد من أن الرابط متاح للجميع (Anyone with the link)")
     
