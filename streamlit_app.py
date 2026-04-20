@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-# إعدادات الفخامة
-st.set_page_config(page_title="VIP Real Estate", layout="wide")
+# إعدادات الفخامة والاسم العام
+st.set_page_config(page_title="Pro Data Matrix", layout="wide")
 
 st.markdown("""
     <style>
@@ -21,15 +21,19 @@ st.markdown("""
         border-radius: 10px;
         font-weight: bold;
     }
+    .date-text {
+        color: #888888 !important;
+        font-size: 0.85em;
+    }
     h2, p { color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# الرابط الخاص بك (تم تحديثه)
+# رابط البيانات
 SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
-st.markdown("<h1 style='text-align: center; color: #d4af37;'>🏰 VIP Real Estate Engine</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #d4af37;'>📊 Pro Data Matrix Engine</h1>", unsafe_allow_html=True)
 
 try:
     df = pd.read_csv(CSV_URL)
@@ -41,15 +45,16 @@ try:
                 <h2>👤 {row['Customer_Name']}</h2>
                 <p>📍 المنطقة: {row['Target_Region']}</p>
                 <p style="color: #2ecc71 !important;">💰 الميزانية: {row['Budget_Range']}</p>
+                <p class="date-text">📅 تاريخ التسجيل: {row['Submission_Date']}</p>
                 <div style="background-color: #2c3e50; padding: 15px; border-radius: 10px;">
                     <p>🤖 <b>التحليل الذكي:</b><br>{row['Ai_Analysis']}</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # زر الواتساب (باستخدام الرابط الموجود في الشيت أصلاً)
+            # زر الواتساب الاحترافي
             st.link_button(f"تواصل مع {row['Customer_Name']} 💬", f"https://wa.me/{row['Phone_Number']}", use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
 except Exception as e:
-    st.error("تأكد من تفعيل المشاركة في الجوجل شيت")
-  
+    st.error("فشل في قراءة البيانات، تأكد من أن الرابط متاح للجميع (Anyone with the link)")
+    
