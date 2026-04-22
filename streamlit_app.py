@@ -16,7 +16,7 @@ SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 WEBHOOK_URL = "https://eomfdq8l221q30q.m.pipedream.net"
 
-# --- واجهة الزبون (واجهة الـ QR Code) ---
+# --- واجهة الزبون (الـ QR Code) ---
 if is_client:
     st.markdown("<h2 style='text-align: center; color: #d4af37;'>🏢 مكتب العقار - تسجيل طلب</h2>", unsafe_allow_html=True)
     with st.form("client_form", clear_on_submit=True):
@@ -67,29 +67,29 @@ try:
         c_budget = find_c(['budget', 'الميزانية', 'سعر'])
         c_time = find_c(['submission', 'time', 'date', 'التاريخ'])
 
-        # 2. دالة استخراج الأرقام للترتيب
+        # 2. تنظيف البيانات للترتيب
         def get_num(v):
             try:
                 if pd.isna(v): return 0
+                # استخراج الأرقام فقط (يتعامل مع "30 مليون" و "2 Million")
                 nums = re.findall(r'\d+', str(v))
                 return int(nums[0]) if nums else 0
             except: return 0
 
-        # 3. تجهيز الترتيب (الميزانية ثم الوقت)
-        df['temp_b'] = df[c_budget].apply(get_num)
-        df['temp_t'] = pd.to_datetime(df[c_time], errors='coerce')
+        # إنشاء أعمدة ترتيب مخفية
+        df['sort_b'] = df[c_budget].apply(get_num)
+        df['sort_t'] = pd.to_datetime(df[c_time], errors='coerce')
+
+        # 3. الترتيب الحاسم (الميزانية الأعلى أولاً، ثم الأحدث وقتاً أولاً)
+        df = df.sort_values(by=['sort_b', 'sort_t'], ascending=[False, False]).reset_index(drop=True)
         
-        # ترتيب: أعلى ميزانية (False) ثم أحدث وقت (False)
-        df_display = df.sort_values(by=['temp_b', 'temp_t'], ascending=[False, False])
-        
-        # 4. عرض البيانات
-        for _, row in df_display.iterrows():
+        # 4. عرض البيانات المرتبة
+        for _, row in df.iterrows():
             def v(k):
                 for col in row.index:
                     if k.lower() in str(col).lower(): return str(row[col])
                 return "N/A"
             
-            # جلب التاريخ الصحيح
             display_time = str(row[c_time]) if c_time in row else "غير محدد"
             
             with st.container():
@@ -105,14 +105,14 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # زر الواتساب
+                # زر الواتساب المنظف
                 p_raw = v('Phone')
-                p_num = re.sub(r'\D', '', p_raw) # تنظيف الرقم من أي رموز
+                p_num = re.sub(r'\D', '', str(p_raw))
                 st.link_button(f"تواصل عبر واتساب 💬", f"https://wa.me/{p_num}", use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("لا توجد طلبات مسجلة حالياً.")
 
 except Exception as e:
-    st.error(f"حدث خطأ أثناء تحميل البيانات: {e}")
+    st.error(f"حدث خطأ في النظام: {e}")
     
