@@ -7,7 +7,7 @@ import re
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
 
-# التحقق من "الوضع" (زبون أم مدير)
+# التحقق من الوضع (زبون أم مدير)
 query_params = st.query_params
 is_client = query_params.get("view") == "client"
 
@@ -16,7 +16,7 @@ SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 WEBHOOK_URL = "https://eomfdq8l221q30q.m.pipedream.net"
 
-# --- واجهة الزبون (الـ QR Code) ---
+# --- واجهة الزبون ---
 if is_client:
     st.markdown("<h2 style='text-align: center; color: #d4af37;'>🏢 مكتب العقار - تسجيل طلب</h2>", unsafe_allow_html=True)
     with st.form("client_form", clear_on_submit=True):
@@ -35,14 +35,12 @@ if is_client:
                     if response.status_code in [200, 201]: st.success("✅ تم استلام طلبك بنجاح!")
                     else: st.error("خطأ في الربط.")
                 except: st.error("فشل الاتصال بالخادم.")
-            else:
-                st.warning("يرجى ملء الاسم والهاتف.")
+            else: st.warning("يرجى ملء الاسم والهاتف.")
     st.stop()
 
-# --- واجهة الإدارة (المحمية) ---
+# --- واجهة الإدارة ---
 PASSWORD = "123456246SsS@"
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
+if "authenticated" not in st.session_state: st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
     st.markdown("<h2 style='text-align: center; color: #d4af37;'>🔒 لوحة التحكم</h2>", unsafe_allow_html=True)
@@ -52,13 +50,12 @@ if not st.session_state["authenticated"]:
         st.rerun()
     st.stop()
 
-# تنسيق العرض
 st.markdown("""<style>.property-card { background-color: #1a1c24; border-radius: 15px; padding: 20px; border: 1px solid #d4af37; margin-bottom: 20px; }</style>""", unsafe_allow_html=True)
 
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        # 1. تحديد الأعمدة بذكاء
+        # البحث عن الأعمدة
         def find_c(names):
             for c in df.columns:
                 if any(n.lower() in c.lower() for n in names): return c
@@ -67,23 +64,31 @@ try:
         c_budget = find_c(['budget', 'الميزانية', 'سعر'])
         c_time = find_c(['submission', 'time', 'date', 'التاريخ'])
 
-        # 2. تنظيف البيانات للترتيب
-        def get_num(v):
+        # دالة "تأديب النذلين" وتوحيد العملات للترتيب فقط
+        def get_unified_value(v):
             try:
                 if pd.isna(v): return 0
-                # استخراج الأرقام فقط (يتعامل مع "30 مليون" و "2 Million")
-                nums = re.findall(r'\d+', str(v))
-                return int(nums[0]) if nums else 0
+                val_str = str(v).lower()
+                nums = re.findall(r'\d+', val_str)
+                if not nums: return 0
+                number = int(nums[0])
+                
+                # إذا كان دولار، نحوله لدينار (بضرب بـ 1500) للترتيب فقط
+                if any(x in val_str for x in ['$', 'usd', 'dollar', 'دولار', 'million_usd']):
+                    # إذا كان الرقم صغير جداً (مثل 2 مليون)، نضربه بمضاعفات لتناسب قيمة الدينار
+                    if 'million' in val_str or number < 1000:
+                         return number * 1000000 * 1500 # تحويل الملايين دولار لدينار
+                    return number * 1500
+                return number
             except: return 0
 
-        # إنشاء أعمدة ترتيب مخفية
-        df['sort_b'] = df[c_budget].apply(get_num)
-        df['sort_t'] = pd.to_datetime(df[c_time], errors='coerce')
+        # إنشاء أعمدة الترتيب
+        df['sort_b'] = df[c_budget].apply(get_unified_value)
+        df['sort_t'] = pd.to_datetime(df[c_time], dayfirst=True, errors='coerce')
 
-        # 3. الترتيب الحاسم (الميزانية الأعلى أولاً، ثم الأحدث وقتاً أولاً)
+        # الترتيب: الأعلى ميزانية (موحدة) ثم الأحدث وقتاً
         df = df.sort_values(by=['sort_b', 'sort_t'], ascending=[False, False]).reset_index(drop=True)
         
-        # 4. عرض البيانات المرتبة
         for _, row in df.iterrows():
             def v(k):
                 for col in row.index:
@@ -105,14 +110,11 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # زر الواتساب المنظف
                 p_raw = v('Phone')
                 p_num = re.sub(r'\D', '', str(p_raw))
                 st.link_button(f"تواصل عبر واتساب 💬", f"https://wa.me/{p_num}", use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-    else:
-        st.info("لا توجد طلبات مسجلة حالياً.")
-
+    else: st.info("لا توجد طلبات.")
 except Exception as e:
-    st.error(f"حدث خطأ في النظام: {e}")
+    st.error(f"حدث خطأ: {e}")
     
