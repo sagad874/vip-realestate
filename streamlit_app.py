@@ -1,26 +1,35 @@
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        # تأكد من وجود الأعمدة أو استبدلها بأسماء افتراضية
-        col_budget = 'Budget' if 'Budget' in df.columns else df.columns[3] # العمود الرابع غالباً
-        col_time = 'Time' if 'Time' in df.columns else df.columns[0]     # العمود الأول غالباً
+        # 1. تحديد الأعمدة بذكاء (حتى لو تغيرت الأسماء)
+        # سنبحث عن الأعمدة التي تحتوي على هذه الكلمات
+        def find_col(possible_names):
+            for col in df.columns:
+                if any(name.lower() in col.lower() for name in possible_names):
+                    return col
+            return df.columns[0] # افتراضي
 
-        # دالة استخراج الأرقام
+        col_budget = find_col(['budget', 'الميزانية', 'سعر'])
+        col_time = find_col(['time', 'timestamp', 'التاريخ', 'الوقت'])
+
+        # 2. دالة استخراج الأرقام (تجنب الأخطاء تماماً)
         def extract_numeric_budget(val):
             try:
+                if pd.isna(val): return 0
                 numbers = re.findall(r'\d+', str(val))
                 return int(numbers[0]) if numbers else 0
-            except: return 0
+            except:
+                return 0
 
-        # إنشاء الأعمدة المؤقتة بأمان
+        # 3. إنشاء الأعمدة المؤقتة للترتيب
         df['temp_budget'] = df[col_budget].apply(extract_numeric_budget)
+        # تحويل الوقت مع معالجة الأخطاء (errors='coerce' تحول الخطأ إلى فراغ)
         df['temp_time'] = pd.to_datetime(df[col_time], errors='coerce')
 
-        # الترتيب (الأعلى ميزانية ثم الأحدث وقتاً)
+        # 4. الترتيب المزدوج (الميزانية الأعلى ثم الوقت الأحدث)
         df_display = df.sort_values(by=['temp_budget', 'temp_time'], ascending=[False, False])
         
         for _, row in df_display.iterrows():
-            # دالة مرنة لجلب البيانات حتى لو اختلف اسم العمود
             def get_v(key):
                 for col in row.index:
                     if key.lower() in str(col).lower(): return str(row[col])
@@ -43,5 +52,8 @@ try:
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("لا توجد بيانات حالياً في الجدول.")
-except Exception as e:
-    st.error(f"حدث خطأ في قراءة البيانات: {e}") # هذا السطر سيخبرك بالضبط ما هي المشكلة
+
+except Exception as err:
+    # هنا أصلحنا الخطأ: استخدمنا 'err' بدل 'e' المعطلة
+    st.error(f"حدث خطأ تقني: {err}")
+    
