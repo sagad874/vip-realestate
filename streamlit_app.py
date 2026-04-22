@@ -64,7 +64,7 @@ try:
         c_budget = find_c(['budget', 'الميزانية', 'سعر'])
         c_time = find_c(['submission', 'time', 'date', 'التاريخ'])
 
-        # دالة توحيد القيم (تحويل الدولار لدينار ذهنياً للترتيب)
+        # دالة توحيد العملات (للترتيب فقط)
         def get_unified_value(v):
             try:
                 if pd.isna(v): return 0
@@ -78,13 +78,12 @@ try:
                 return number
             except: return 0
 
-        # إنشاء أعمدة الترتيب
-        df['sort_b'] = df[c_budget].apply(get_unified_value)
-        # تحويل الوقت لترميز زمني دقيق
+        # --- الفيكة هنا (تصحيح الوقت) ---
+        # نحول الوقت لـ DateTime ونتجاهل الأخطاء، ثم نرتب "تنازلياً" بشكل قطعي
         df['sort_t'] = pd.to_datetime(df[c_time], dayfirst=True, errors='coerce')
+        df['sort_b'] = df[c_budget].apply(get_unified_value)
 
-        # --- السر هنا: الترتيب بالأحدث أولاً (الوقت) ثم الأغلى (الميزانية) ---
-        # جعلنا sort_t هي الأولى في الترتيب
+        # الترتيب: الأحدث وقتاً أولاً (False) ثم الأغلى ميزانية (False)
         df = df.sort_values(by=['sort_t', 'sort_b'], ascending=[False, False]).reset_index(drop=True)
         
         for _, row in df.iterrows():
