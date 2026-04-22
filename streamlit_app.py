@@ -7,7 +7,7 @@ import re
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
 
-# التحقق من الوضع (زبون أم مدير)
+# التحقق من الوضع
 query_params = st.query_params
 is_client = query_params.get("view") == "client"
 
@@ -64,7 +64,7 @@ try:
         c_budget = find_c(['budget', 'الميزانية', 'سعر'])
         c_time = find_c(['submission', 'time', 'date', 'التاريخ'])
 
-        # دالة "تأديب النذلين" وتوحيد العملات للترتيب فقط
+        # دالة توحيد القيم (تحويل الدولار لدينار ذهنياً للترتيب)
         def get_unified_value(v):
             try:
                 if pd.isna(v): return 0
@@ -72,22 +72,20 @@ try:
                 nums = re.findall(r'\d+', val_str)
                 if not nums: return 0
                 number = int(nums[0])
-                
-                # إذا كان دولار، نحوله لدينار (بضرب بـ 1500) للترتيب فقط
-                if any(x in val_str for x in ['$', 'usd', 'dollar', 'دولار', 'million_usd']):
-                    # إذا كان الرقم صغير جداً (مثل 2 مليون)، نضربه بمضاعفات لتناسب قيمة الدينار
-                    if 'million' in val_str or number < 1000:
-                         return number * 1000000 * 1500 # تحويل الملايين دولار لدينار
+                if any(x in val_str for x in ['$', 'usd', 'dollar', 'دولار']):
+                    if number < 10000: return number * 1000000 * 1500
                     return number * 1500
                 return number
             except: return 0
 
         # إنشاء أعمدة الترتيب
         df['sort_b'] = df[c_budget].apply(get_unified_value)
+        # تحويل الوقت لترميز زمني دقيق
         df['sort_t'] = pd.to_datetime(df[c_time], dayfirst=True, errors='coerce')
 
-        # الترتيب: الأعلى ميزانية (موحدة) ثم الأحدث وقتاً
-        df = df.sort_values(by=['sort_b', 'sort_t'], ascending=[False, False]).reset_index(drop=True)
+        # --- السر هنا: الترتيب بالأحدث أولاً (الوقت) ثم الأغلى (الميزانية) ---
+        # جعلنا sort_t هي الأولى في الترتيب
+        df = df.sort_values(by=['sort_t', 'sort_b'], ascending=[False, False]).reset_index(drop=True)
         
         for _, row in df.iterrows():
             def v(k):
