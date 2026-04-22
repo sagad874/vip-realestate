@@ -67,17 +67,21 @@ st.markdown("""<style>.property-card { background-color: #1a1c24; border-radius:
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        # --- ميزة الترتيب الجديدة حسب الميزانية ---
+        # دالة استخراج الأرقام للترتيب
         def extract_numeric_budget(val):
-            # استخراج الأرقام فقط من نص الميزانية (مثلاً "500 مليون" تصبح 500)
             numbers = re.findall(r'\d+', str(val))
             return int(numbers[0]) if numbers else 0
 
-        # إنشاء عمود مؤقت للترتيب (لن يظهر للزبون)
-        df['temp_sort'] = df.apply(lambda x: extract_numeric_budget(x.get('Budget', '0')), axis=1)
+        # 1. إنشاء عمود مؤقت للميزانية
+        df['temp_budget'] = df.apply(lambda x: extract_numeric_budget(x.get('Budget', '0')), axis=1)
         
-        # ترتيب الجدول من الأعلى إلى الأقل
-        df_display = df.sort_values(by='temp_sort', ascending=False)
+        # 2. تحويل عمود الوقت إلى صيغة قابلة للترتيب (Timestamp)
+        # نفترض اسم العمود 'Time' كما في صورتك
+        df['temp_time'] = pd.to_datetime(df['Time'], errors='coerce')
+
+        # --- الترتيب المزدوج السحري ---
+        #ascending=[False, False] تعني الأعلى ميزانية أولاً، ثم الأحدث تاريخاً أولاً
+        df_display = df.sort_values(by=['temp_budget', 'temp_time'], ascending=[False, False])
         
         for _, row in df_display.iterrows():
             def get_v(key):
@@ -85,6 +89,7 @@ try:
                     if key.lower() in str(col).lower(): return str(row[col])
                 return "N/A"
             
+            # عرض الكارتات
             with st.container():
                 st.markdown(f"""
                 <div class="property-card">
