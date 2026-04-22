@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import requests
+import re
 
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
@@ -28,7 +29,6 @@ if is_client:
         
         if submitted:
             if name and phone:
-                # إرسال البيانات كـ Query Parameters لتطابق صور Pipedream
                 payload = {
                     "name": name,
                     "phone": phone,
@@ -37,7 +37,6 @@ if is_client:
                     "details": details
                 }
                 try:
-                    # نرسل المعلومات كـ params لأن Pipedream عندك يقرأ من event.query
                     response = requests.post(WEBHOOK_URL, params=payload)
                     if response.status_code in [200, 201]:
                         st.success("✅ تم استلام طلبك بنجاح!")
@@ -68,7 +67,18 @@ st.markdown("""<style>.property-card { background-color: #1a1c24; border-radius:
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        df_display = df.iloc[::-1] 
+        # --- ميزة الترتيب الجديدة حسب الميزانية ---
+        def extract_numeric_budget(val):
+            # استخراج الأرقام فقط من نص الميزانية (مثلاً "500 مليون" تصبح 500)
+            numbers = re.findall(r'\d+', str(val))
+            return int(numbers[0]) if numbers else 0
+
+        # إنشاء عمود مؤقت للترتيب (لن يظهر للزبون)
+        df['temp_sort'] = df.apply(lambda x: extract_numeric_budget(x.get('Budget', '0')), axis=1)
+        
+        # ترتيب الجدول من الأعلى إلى الأقل
+        df_display = df.sort_values(by='temp_sort', ascending=False)
+        
         for _, row in df_display.iterrows():
             def get_v(key):
                 for col in row.index:
@@ -78,16 +88,18 @@ try:
             with st.container():
                 st.markdown(f"""
                 <div class="property-card">
-                    <h2 style='color:white;'>👤 {get_v('Customer')}</h2>
+                    <h2 style='color:white;'>👤 {get_v('Name')}</h2>
                     <p style='color:white;'>📍 المنطقة: {get_v('Region')}</p>
-                    <p style="color: #2ecc71 !important; font-weight: bold;">💰 الميزانية: {get_v('Budget')}</p>
-                    <p style="color: #888;">📅 {get_v('Submission') or get_v('Date')}</p>
+                    <p style="color: #2ecc71 !important; font-weight: bold; font-size: 1.2em;">💰 الميزانية: {get_v('Budget')}</p>
+                    <p style="color: #888;">📅 {get_v('Time')}</p>
                     <div style="background-color: #2c3e50; padding: 15px; border-radius: 10px;">
-                        <p style='color:white;'>🤖 <b>الطلب:</b><br>{get_v('Analysis')}</p>
+                        <p style='color:white;'>🤖 <b>التحليل الذكي:</b><br>{get_v('Analysis')}</p>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-                st.link_button("واتساب 💬", f"https://wa.me/{get_v('Phone').replace('.0','')}", use_container_width=True)
-except:
+                phone_num = str(get_v('Phone')).replace('.0','')
+                st.link_button("واتساب 💬", f"https://wa.me/{phone_num}", use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+except Exception as e:
     st.warning("جاري مزامنة البيانات...")
     
