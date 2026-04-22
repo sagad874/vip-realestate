@@ -1,95 +1,31 @@
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-import requests
-import re
-
-# 1. إعدادات الصفحة
-st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
-
-# التحقق من "الوضع" (زبون أم مدير)
-query_params = st.query_params
-is_client = query_params.get("view") == "client"
-
-# روابط البيانات
-SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-WEBHOOK_URL = "https://eomfdq8l221q30q.m.pipedream.net"
-
-# --- واجهة الزبون (واجهة الـ QR Code) ---
-if is_client:
-    st.markdown("<h2 style='text-align: center; color: #d4af37;'>🏢 مكتب العقار - تسجيل طلب</h2>", unsafe_allow_html=True)
-    with st.form("client_form", clear_on_submit=True):
-        name = st.text_input("الاسم الكامل")
-        phone = st.text_input("رقم الهاتف (واتساب)")
-        region = st.selectbox("المنطقة المطلوبة", ["شهداء البياع", "المنصور", "حي الجامعة", "السيدية", "أخرى"])
-        budget = st.text_input("الميزانية التقريبية")
-        details = st.text_area("تفاصيل العقار المطلوب")
-        submitted = st.form_submit_button("إرسال الطلب الآن 🚀")
-        
-        if submitted:
-            if name and phone:
-                payload = {
-                    "name": name,
-                    "phone": phone,
-                    "region": region,
-                    "budget": budget,
-                    "details": details
-                }
-                try:
-                    response = requests.post(WEBHOOK_URL, params=payload)
-                    if response.status_code in [200, 201]:
-                        st.success("✅ تم استلام طلبك بنجاح!")
-                    else:
-                        st.error("خطأ في الربط مع النظام.")
-                except:
-                    st.error("فشل الاتصال بالخادم.")
-            else:
-                st.warning("يرجى ملء الاسم والهاتف.")
-    st.stop()
-
-# --- واجهة الإدارة (المحمية) ---
-PASSWORD = "123456246SsS@"
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-
-if not st.session_state["authenticated"]:
-    st.markdown("<h2 style='text-align: center; color: #d4af37;'>🔒 لوحة التحكم</h2>", unsafe_allow_html=True)
-    user_input = st.text_input("رمز الوصول:", type="password")
-    if user_input == PASSWORD:
-        st.session_state["authenticated"] = True
-        st.rerun()
-    st.stop()
-
-# تنسيق العرض للمدير
-st.markdown("""<style>.property-card { background-color: #1a1c24; border-radius: 15px; padding: 20px; border: 1px solid #d4af37; margin-bottom: 20px; }</style>""", unsafe_allow_html=True)
-
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        # دالة استخراج الأرقام للترتيب
+        # تأكد من وجود الأعمدة أو استبدلها بأسماء افتراضية
+        col_budget = 'Budget' if 'Budget' in df.columns else df.columns[3] # العمود الرابع غالباً
+        col_time = 'Time' if 'Time' in df.columns else df.columns[0]     # العمود الأول غالباً
+
+        # دالة استخراج الأرقام
         def extract_numeric_budget(val):
-            numbers = re.findall(r'\d+', str(val))
-            return int(numbers[0]) if numbers else 0
+            try:
+                numbers = re.findall(r'\d+', str(val))
+                return int(numbers[0]) if numbers else 0
+            except: return 0
 
-        # 1. إنشاء عمود مؤقت للميزانية
-        df['temp_budget'] = df.apply(lambda x: extract_numeric_budget(x.get('Budget', '0')), axis=1)
-        
-        # 2. تحويل عمود الوقت إلى صيغة قابلة للترتيب (Timestamp)
-        # نفترض اسم العمود 'Time' كما في صورتك
-        df['temp_time'] = pd.to_datetime(df['Time'], errors='coerce')
+        # إنشاء الأعمدة المؤقتة بأمان
+        df['temp_budget'] = df[col_budget].apply(extract_numeric_budget)
+        df['temp_time'] = pd.to_datetime(df[col_time], errors='coerce')
 
-        # --- الترتيب المزدوج السحري ---
-        #ascending=[False, False] تعني الأعلى ميزانية أولاً، ثم الأحدث تاريخاً أولاً
+        # الترتيب (الأعلى ميزانية ثم الأحدث وقتاً)
         df_display = df.sort_values(by=['temp_budget', 'temp_time'], ascending=[False, False])
         
         for _, row in df_display.iterrows():
+            # دالة مرنة لجلب البيانات حتى لو اختلف اسم العمود
             def get_v(key):
                 for col in row.index:
                     if key.lower() in str(col).lower(): return str(row[col])
                 return "N/A"
             
-            # عرض الكارتات
             with st.container():
                 st.markdown(f"""
                 <div class="property-card">
@@ -105,6 +41,7 @@ try:
                 phone_num = str(get_v('Phone')).replace('.0','')
                 st.link_button("واتساب 💬", f"https://wa.me/{phone_num}", use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        st.info("لا توجد بيانات حالياً في الجدول.")
 except Exception as e:
-    st.warning("جاري مزامنة البيانات...")
-    
+    st.error(f"حدث خطأ في قراءة البيانات: {e}") # هذا السطر سيخبرك بالضبط ما هي المشكلة
