@@ -5,16 +5,15 @@ import requests
 import re
 import json
 
-# 1. إعدادات الصفحة الفخمة
+# 1. إعدادات الصفحة
 st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
 
-# استخراج المعلمات من الرابط (المكتب والواجهة)
+# استخراج المعلمات من الرابط
 query_params = st.query_params
 is_client = query_params.get("view") == "client"
-office_id = query_params.get("id", "bayaa") # المكتب الافتراضي
+office_id = query_params.get("id", "bayaa")
 
 # 2. إدارة البيانات المركزية (Master Sheet)
-# هذا الجدول هو الذي يحتوي على روابط الـ Webhook لكل مكتب
 MASTER_SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
 MASTER_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MASTER_SHEET_ID}/export?format=csv"
 
@@ -36,14 +35,13 @@ def get_office_config(oid):
             "name": "مكتب العقارات"
         }
 
-# تحميل إعدادات المكتب المختار
 config = get_office_config(office_id)
 SHEET_ID = config['sheet_id']
 WEBHOOK_URL = config['webhook']
 OFFICE_NAME = config['name']
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
-# --- واجهة الزبون (Client View) ---
+# --- واجهة الزبون (الترتيب العمودي - واحدة تحت الأخرى) ---
 if is_client:
     if "submitted" not in st.session_state:
         st.session_state.submitted = False
@@ -51,34 +49,29 @@ if is_client:
     if not st.session_state.submitted:
         st.markdown(f"<h2 style='text-align: center; color: #d4af37;'>🏢 {OFFICE_NAME} - تسجيل طلب</h2>", unsafe_allow_html=True)
         with st.form("client_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                name = st.text_input("الاسم الكامل")
-                phone = st.text_input("رقم الهاتف (واتساب)")
-            with col2:
-                region = st.selectbox("المنطقة المطلوبة", ["شهداء البياع", "المنصور", "حي الجامعة", "السيدية", "أخرى"])
-                budget = st.text_input("الميزانية التقريبية")
-            
+            # الحقول مرتبة عمودياً كما طلبت
+            name = st.text_input("الاسم الكامل")
+            phone = st.text_input("رقم الهاتف (واتساب)")
+            region = st.selectbox("المنطقة المطلوبة", ["شهداء البياع", "المنصور", "حي الجامعة", "السيدية", "أخرى"])
+            budget = st.text_input("الميزانية التقريبية")
             details = st.text_area("تفاصيل العقار المطلوب")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
             send_btn = st.form_submit_button("إرسال الطلب الآن 🚀", use_container_width=True)
             
             if send_btn:
                 if name and phone:
                     payload = {"name": name, "phone": phone, "region": region, "budget": budget, "details": details}
                     try:
-                        # إرسال ذكي: يكتشف نوع الرابط ويرسل بالطريقة المناسبة
                         if "script.google.com" in WEBHOOK_URL:
-                            # لجوجل سكريبت نرسل JSON
                             requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"}, timeout=8)
                         else:
-                            # لـ Pipedream نرسل Params (الطريقة الأصلية)
                             requests.post(WEBHOOK_URL, params=payload, timeout=8)
                         
-                        # إجبار النجاح: بما أن البيانات تصل للجدول، ننتقل فوراً لصفحة الشكر
                         st.session_state.submitted = True
                         st.rerun()
                     except:
-                        # حتى لو حدث خطأ في استلام الرد (CORS)، نعتبره نجح ما دام تم الإرسال
+                        # تجاوز أي خطأ في الرد لضمان ظهور رسالة النجاح
                         st.session_state.submitted = True
                         st.rerun()
                 else:
@@ -98,7 +91,7 @@ if is_client:
             st.rerun()
     st.stop()
 
-# --- واجهة الإدارة (Admin View) ---
+# --- واجهة الإدارة ---
 PASSWORD = "123456246SsS@"
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
@@ -111,7 +104,6 @@ if not st.session_state["authenticated"]:
         st.rerun()
     st.stop()
 
-# تنسيق البطاقات العقارية
 st.markdown("""<style>.prop-card { background-color: #1a1c24; border-radius: 15px; padding: 20px; border: 1px solid #d4af37; margin-bottom: 20px; }</style>""", unsafe_allow_html=True)
 
 try:
