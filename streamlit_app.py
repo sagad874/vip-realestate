@@ -6,37 +6,34 @@ import re
 from io import StringIO
 
 # 1. إعدادات الصفحة
-st.set_page_config(page_title="عقارات البياع | Pro Data Matrix", layout="wide")
+st.set_page_config(page_title="Matrix Pro | عقارات البياع", layout="wide")
 
-# --- 🛠️ الإعدادات الثابتة (بياناتك) ---
+# --- 🛠️ الإعدادات (بياناتك كاملة) ---
 OFFICE_NAME = "عقارات البياع" 
 ADMIN_PWD = "123456246SsS@" 
 MY_SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac" 
 WEBHOOK_URL = "https://eomfdq8l221q30q.m.pipedream.net"
 DATA_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MY_SHEET_ID}/export?format=csv"
 
-# التحقق من نوع الواجهة (?view=client للزبائن)
-query_params = st.query_params
-is_client = query_params.get("view") == "client"
+# التحقق من نوع الواجهة
+is_client = st.query_params.get("view") == "client"
 
-# --- 📊 دالة الترتيب الذكي للميزانية (دولار ودينار) ---
+# --- 📊 دالة الترتيب الذكي (وحدت لك منطق الميزانية) ---
 def get_unified_budget(v):
     try:
         if pd.isna(v): return 0
-        val_str = str(v).lower()
-        nums = re.findall(r'\d+', val_str)
+        v_str = str(v).lower()
+        nums = re.findall(r'\d+', v_str)
         if not nums: return 0
-        number = int(nums[0])
-        # تحويل تقريبي للترتيب (الدفتر والورقة والدولار)
-        if any(x in val_str for x in ['$', 'دولار', 'دفتر', 'ورقة']):
-            return number * 1500000 
-        return number
+        n = int(nums[0])
+        if any(x in v_str for x in ['$', 'دولار', 'دفتر', 'ورقة']):
+            return n * 1500000 
+        return n
     except: return 0
 
-# --- 📱 أولاً: واجهة الزبائن (مع البالونات) ---
+# --- 📱 أولاً: واجهة الزبائن (مع البالونات واسم المكتب) ---
 if is_client:
-    if "submitted" not in st.session_state:
-        st.session_state.submitted = False
+    if "submitted" not in st.session_state: st.session_state.submitted = False
 
     if not st.session_state.submitted:
         st.markdown(f"<h1 style='text-align: center; color: #d4af37;'>🏢 {OFFICE_NAME}</h1>", unsafe_allow_html=True)
@@ -47,80 +44,76 @@ if is_client:
             region = st.selectbox("المنطقة المطلوبة", ["البياع", "شهداء البياع", "السيدية", "أخرى"])
             budget = st.text_input("الميزانية التقريبية")
             details = st.text_area("تفاصيل العقار")
-            
             if st.form_submit_button("إرسال الطلب الآن 🚀"):
                 if name and phone:
-                    payload = {"name": name, "phone": phone, "region": region, "budget": budget, "details": details, "source": OFFICE_NAME}
-                    try:
-                        requests.post(WEBHOOK_URL, params=payload, timeout=5)
-                        st.session_state.submitted = True
-                        st.rerun()
-                    except: st.error("فشل الإرسال")
-                else: st.warning("اكمل البيانات")
+                    requests.post(WEBHOOK_URL, params={"name":name, "phone":phone, "region":region, "budget":budget, "details":details, "source":OFFICE_NAME})
+                    st.session_state.submitted = True
+                    st.rerun()
+                else: st.warning("يرجى ملء البيانات.")
     else:
-        st.balloons() # تأثير البالونات
+        st.balloons()
         st.markdown(f"""
-            <div style="text-align: center; padding: 40px; background-color: #1a1c24; border-radius: 20px; border: 2px solid #d4af37; margin-top: 30px;">
-                <h1 style="color: #d4af37;">✅ تم الإرسال بنجاح!</h1>
-                <p style="color: white;">شكراً لثقتكم. سنتواصل معكم قريباً.</p>
-                <p style="color: #666; font-size: 0.8em; margin-top: 20px;">تطوير المبرمج سجاد</p>
+            <div style='text-align: center; padding: 40px; background-color: #1a1c24; border: 2px solid #d4af37; border-radius: 20px;'>
+                <h1 style='color: #d4af37;'>✅ تم الإرسال بنجاح!</h1>
+                <p style='color: white;'>شكراً لثقتكم بمكتب <b>{OFFICE_NAME}</b>.</p>
+                <p style='color: #666; font-size: 0.8em; margin-top: 20px;'>تم التطوير بواسطة المبرمج سجاد</p>
             </div>
         """, unsafe_allow_html=True)
-        if st.button("إرسال طلب آخر"):
+        if st.button("إرسال طلب جديد"):
             st.session_state.submitted = False
             st.rerun()
     st.stop()
 
-# --- 🔒 ثانياً: واجهة الإدارة (مع الترتيب والكروت) ---
+# --- 🔒 ثانياً: واجهة الإدارة (مع اسم المكتب والترتيب) ---
 if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
-    st.markdown("<h2 style='text-align: center;'>🔒 دخول الإدارة</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='text-align: center; color: #d4af37;'>🔒 دخول إدارة {OFFICE_NAME}</h2>", unsafe_allow_html=True)
     col_a, col_b, col_c = st.columns([1,2,1])
     with col_b:
         pwd = st.text_input("الرمز السري:", type="password")
-        if st.button("دخول", use_container_width=True):
+        if st.button("تسجيل الدخول", use_container_width=True):
             if pwd == ADMIN_PWD:
                 st.session_state.auth = True
                 st.rerun()
-            else: st.error("خطأ!")
+            else: st.error("الرمز السري خطأ!")
     st.stop()
 
-# عرض البيانات للإدارة
-st.markdown(f"### 📊 سجل طلبات {OFFICE_NAME}")
+# --- عرض سجل الطلبات للإدارة ---
+st.markdown(f"<h2 style='color: #d4af37;'>📊 سجل طلبات {OFFICE_NAME}</h2>", unsafe_allow_html=True)
 
 try:
-    # جلب البيانات مع حل مشكلة الرموز العربية (UTF-8)
+    # جلب البيانات مع ضمان ترميز العربي
     resp = requests.get(f"{DATA_CSV_URL}&cb={datetime.now().timestamp()}", timeout=15)
-    resp.encoding = 'utf-8' 
+    resp.encoding = 'utf-8'
     df = pd.read_csv(StringIO(resp.text))
     df.columns = [c.strip() for c in df.columns]
 
     if not df.empty:
-        # الترتيب حسب الوقت (الأحدث) ثم الميزانية (الأعلى)
+        # نظام الترتيب: الأحدث ثم الأعلى ميزانية
         df['sort_t'] = pd.to_datetime(df['Submission_Date'], dayfirst=True, errors='coerce')
         df['sort_b'] = df['Budget_Range'].apply(get_unified_budget)
         df = df.sort_values(by=['sort_t', 'sort_b'], ascending=[False, False])
 
-        for idx, row in df.iterrows():
+        for _, row in df.iterrows():
             st.markdown(f"""
             <div style="background-color: #1a1c24; border-radius: 15px; padding: 20px; border-right: 5px solid #d4af37; margin-bottom: 20px; direction: rtl; text-align: right;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="color: white; margin: 0;">👤 {row.get('Customer_Name', 'غير معروف')}</h3>
+                <div style="display: flex; justify-content: space-between;">
+                    <h3 style="color: white; margin: 0;">👤 {row.get('Customer_Name', 'N/A')}</h3>
                     <span style="background-color: #d4af37; color: black; padding: 2px 10px; border-radius: 10px; font-weight: bold; font-size: 0.8em;">{row.get('Lead_Quality', 'N/A')}</span>
                 </div>
-                <p style="color: #888; font-size: 0.85em; margin: 5px 0;">📅 التاريخ: {row.get('Submission_Date', '')}</p>
+                <p style="color: #888; font-size: 0.8em; margin: 5px 0;">📅 {row.get('Submission_Date', '')}</p>
                 <hr style="border: 0.1px solid #333;">
-                <p style="color: #2ecc71; margin: 5px 0;"><b>💰 الميزانية:</b> {row.get('Budget_Range', '')}</p>
-                <p style="color: #3498db; margin: 5px 0;"><b>📍 المنطقة:</b> {row.get('Target_Region', '')}</p>
+                <p style="color: #2ecc71;"><b>💰 الميزانية:</b> {row.get('Budget_Range', '')}</p>
+                <p style="color: #3498db;"><b>📍 المنطقة:</b> {row.get('Target_Region', '')}</p>
                 <div style="background-color: #252833; padding: 12px; border-radius: 8px; margin-top: 10px;">
-                    <p style="color: #ecf0f1; font-size: 0.95em; margin: 0;"><b>🤖 التحليل الذكي:</b><br>{row.get('Ai_Analysis', '')}</p>
+                    <p style="color: #ecf0f1; font-size: 0.95em;"><b>🤖 التحليل:</b><br>{row.get('Ai_Analysis', '')}</p>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            p_clean = re.sub(r'\D', '', str(row.get('Phone_Number', '')))
-            st.link_button(f"تواصل واتساب 💬", f"https://wa.me/{p_clean}", use_container_width=True)
+            p = re.sub(r'\D', '', str(row.get('Phone_Number', '')))
+            st.link_button(f"تواصل واتساب مباشر 💬", f"https://wa.me/{p}", use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
-    else: st.info("لا توجد بيانات.")
+    else: st.info("الجدول فارغ حالياً.")
 except Exception as e: st.error(f"حدث خطأ: {e}")
     
