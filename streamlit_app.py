@@ -8,19 +8,18 @@ import json
 # 1. إعدادات الصفحة
 st.set_page_config(page_title="Pro Data Matrix | Secured", layout="wide")
 
-# استخراج المعلمات من الرابط (المكتب والواجهة)
+# استخراج المعلمات من الرابط
 query_params = st.query_params
 is_client = query_params.get("view") == "client"
 office_id = query_params.get("id", "bayaa")
 
-# 2. إدارة البيانات المركزية (رابط الماستر شيت الخاص بك)
+# 2. إدارة البيانات المركزية (المحرك)
 MASTER_CSV = "https://docs.google.com/spreadsheets/d/1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac/export?format=csv"
 
-@st.cache_data(ttl=1) # تحديث فوري كل ثانية
+@st.cache_data(ttl=1)
 def load_office_config(oid):
-    # إعدادات افتراضية فخمة في حال فشل الاتصال
     default_config = {
-        "name": "المركز العقاري المعتمد", 
+        "name": "المركز العقاري الموحد", 
         "webhook": "https://eomfdq8l221q30q.m.pipedream.net",
         "sheet": "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac",
         "pass": "123456246SsS@"
@@ -41,7 +40,6 @@ def load_office_config(oid):
     except:
         return default_config
 
-# تحميل بيانات المكتب الحالي
 config = load_office_config(office_id)
 OFFICE_NAME = config['name']
 WEBHOOK_URL = config['webhook']
@@ -55,14 +53,21 @@ if is_client:
         st.session_state.submitted = False
 
     if not st.session_state.submitted:
-        # اسم المكتب يظهر هنا ديناميكياً
         st.markdown(f"<h2 style='text-align: center; color: #d4af37;'>🏢 {OFFICE_NAME} - تسجيل طلب</h2>", unsafe_allow_html=True)
         with st.form("client_form", clear_on_submit=True):
             name = st.text_input("الاسم الكامل")
             phone = st.text_input("رقم الهاتف (واتساب)")
-            region = st.selectbox("المنطقة المطلوبة", ["شهداء البياع", "المنصور", "حي الجامعة", "السيدية", "أخرى"])
+            
+            # إعادة قائمة مناطق بغداد المنبثقة كاملة
+            baghdad_regions = [
+                "شهداء البياع", "البياع", "المنصور", "حي الجامعة", "السيدية", "العامرية", 
+                "الغزالية", "الدورة", "اليرموك", "القادسية", "زيونة", "بغداد الجديدة", "أخرى"
+            ]
+            region = st.selectbox("المنطقة المطلوبة في بغداد", baghdad_regions)
+            
             budget = st.text_input("الميزانية التقريبية")
             details = st.text_area("تفاصيل العقار المطلوب")
+            
             send_btn = st.form_submit_button(f"إرسال الطلب إلى {OFFICE_NAME} 🚀")
             
             if send_btn:
@@ -78,13 +83,16 @@ if is_client:
                 else:
                     st.warning("يرجى ملء الاسم ورقم الهاتف.")
     else:
+        # إعادة البالونات ورسالة الشكر الفخمة
         st.balloons()
         st.markdown(f"""
             <div style="text-align: center; padding: 50px; background-color: #1a1c24; border-radius: 20px; border: 2px solid #d4af37; margin-top: 50px;">
-                <h1 style="color: #d4af37;">✅ تم استلام طلبك بنجاح!</h1>
-                <p style="color: white; font-size: 1.3em;">شكراً لاختياركم <b>{OFFICE_NAME}</b>، سنتصل بك قريباً.</p>
+                <h1 style="color: #d4af37; margin-bottom: 20px;">✅ تم استلام طلبك بنجاح!</h1>
+                <p style="color: white; font-size: 1.3em;">شكراً لاختياركم <b>{OFFICE_NAME}</b>، نحن نقدّر ثقتكم بنا وسنتصل بك قريباً.</p>
                 <hr style="border-color: #333; margin: 30px 0;">
-                <p style="color: #888; font-style: italic; font-size: 0.9em;">تم تطوير النظام بواسطة المبرمج سجاد</p>
+                <p style="color: #888; font-style: italic; font-size: 0.9em;">
+                    تم تطوير هذا النظام الذكي بواسطة المبرمج <b style="color: #d4af37;">سجاد</b>
+                </p>
             </div>
         """, unsafe_allow_html=True)
         if st.button("إرسال طلب آخر جديد"):
@@ -92,7 +100,7 @@ if is_client:
             st.rerun()
     st.stop()
 
-# --- واجهة الإدارة (مع ميزة الترتيب والتحليل من كودك) ---
+# --- واجهة الإدارة ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
@@ -109,36 +117,23 @@ st.markdown("""<style>.property-card { background-color: #1a1c24; border-radius:
 try:
     df = pd.read_csv(CSV_URL)
     if not df.empty:
-        # البحث الذكي عن الأعمدة من كودك
+        # البحث الذكي عن الأعمدة
         def find_c(names):
             for c in df.columns:
-                if any(n.lower() in str(c).lower() or n in str(c) for n in names): return c
+                if any(n.lower() in str(c).lower() for n in names): return c
             return df.columns[0]
 
-        c_name = find_c(['name', 'الاسم', 'Name'])
-        c_phone = find_c(['phone', 'هاتف', 'رقم', 'Phone'])
-        c_budget = find_c(['budget', 'الميزانية', 'سعر', 'Budget'])
-        c_region = find_c(['region', 'المنطقة', 'Region'])
+        c_name = find_c(['name', 'الاسم'])
+        c_phone = find_c(['phone', 'هاتف', 'رقم'])
+        c_budget = find_c(['budget', 'الميزانية', 'سعر'])
+        c_region = find_c(['region', 'المنطقة'])
         c_time = find_c(['submission', 'time', 'date', 'التاريخ', 'Timestamp'])
-        c_details = find_c(['details', 'تفاصيل', 'Details'])
-        c_analysis = find_c(['analysis', 'تحليل', 'Analysis'])
+        c_details = find_c(['details', 'تفاصيل'])
+        c_analysis = find_c(['analysis', 'تحليل'])
 
-        # دالة توحيد القيم للترتيب من كودك
-        def get_unified_value(v):
-            try:
-                if pd.isna(v): return 0
-                val_str = str(v).lower()
-                nums = re.findall(r'\d+', val_str)
-                if not nums: return 0
-                number = int(nums[0])
-                if any(x in val_str for x in ['$', 'usd', 'دولار']):
-                    return number * 1500
-                return number
-            except: return 0
-
+        # الترتيب (الأحدث أولاً)
         df['sort_t'] = pd.to_datetime(df[c_time], dayfirst=True, errors='coerce')
-        df['sort_b'] = df[c_budget].apply(get_unified_value)
-        df = df.sort_values(by=['sort_t', 'sort_b'], ascending=[False, False]).reset_index(drop=True)
+        df = df.sort_values(by='sort_t', ascending=False).reset_index(drop=True)
         
         st.markdown(f"<h3 style='color:#d4af37;'>📊 إجمالي طلبات {OFFICE_NAME}: {len(df)}</h3>", unsafe_allow_html=True)
 
@@ -150,11 +145,11 @@ try:
                 st.markdown(f"""
                 <div class="property-card">
                     <div style="display: flex; justify-content: space-between;">
-                        <h2 style='color:white; margin:0;'>👤 {row[c_name]}</h2>
+                        <h2 style='color:white; margin:0;'>👤 {row.get(c_name, 'عميل')}</h2>
                         <span style="color: #888;">📅 {display_time}</span>
                     </div>
-                    <p style='color:white; margin-top:10px;'>📍 المنطقة: <b>{row[c_region]}</b></p>
-                    <p style="color: #2ecc71 !important; font-weight: bold; font-size: 1.3em;">💰 الميزانية: {row[c_budget]}</p>
+                    <p style='color:white; margin-top:10px;'>📍 المنطقة: <b>{row.get(c_region, '—')}</b></p>
+                    <p style="color: #2ecc71 !important; font-weight: bold; font-size: 1.3em;">💰 الميزانية: {row.get(c_budget, '—')}</p>
                     <div style="background-color: #2c3e50; padding: 15px; border-radius: 10px; border-left: 5px solid #d4af37;">
                         <p style='color:white; margin-bottom:5px;'>🤖 <b>تحليل النظام الذكي:</b></p>
                         <p style='color:#ecf0f1;'>{analysis_text}</p>
@@ -162,9 +157,8 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # زر الواتساب الذكي من كودك
-                p_num = re.sub(r'\D', '', str(row[c_phone]))
-                st.link_button(f"تواصل مع {row[c_name]} عبر واتساب 💬", f"https://wa.me/{p_num}", use_container_width=True)
+                p_num = re.sub(r'\D', '', str(row.get(c_phone, '')))
+                st.link_button(f"تواصل عبر واتساب 💬", f"https://wa.me/{p_num}", use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info(f"لا توجد طلبات في {OFFICE_NAME} حالياً.")
