@@ -8,10 +8,10 @@ from io import StringIO
 # 1. إعدادات الصفحة واللغة
 st.set_page_config(page_title="عقارات البياع | Matrix Pro", layout="wide")
 
-# --- 🛠️ الإعدادات الثابتة (بياناتك المباشرة) ---
+# --- 🛠️ الإعدادات الثابتة المستخرجة من بياناتك ---
 OFFICE_NAME = "عقارات البياع" 
-ADMIN_PWD = "123456246SsS@" #
-MY_SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac" #
+ADMIN_PWD = "123456246SsS@" # الرمز السري من صورتك
+MY_SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac" # رابط جدول العقارات
 DATA_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MY_SHEET_ID}/export?format=csv"
 
 # -------------------------------------------------------
@@ -24,7 +24,7 @@ if not st.session_state.auth:
     col_a, col_b, col_c = st.columns([1,2,1])
     with col_b:
         pwd = st.text_input("أدخل الرمز السري:", type="password")
-        if st.button("تسجيل الدخول", use_container_width=True):
+        if st.form_submit_button or st.button("تسجيل الدخول", use_container_width=True):
             if pwd == ADMIN_PWD:
                 st.session_state.auth = True
                 st.rerun()
@@ -36,18 +36,18 @@ if not st.session_state.auth:
 st.markdown(f"### 📊 سجل الطلبات والتحليل الذكي")
 
 try:
-    # جلب البيانات مع فرض ترميز UTF-8 لضمان ظهور اللغة العربية [علاج لمشكلة الصورة 1000030531.jpg]
+    # جلب البيانات مع فرض ترميز UTF-8 لضمان ظهور العربية بشكل سليم [علاج لصورة 1000030531.jpg]
     response = requests.get(f"{DATA_CSV_URL}&cb={datetime.now().timestamp()}", timeout=15)
     response.encoding = 'utf-8' 
     
     if response.status_code == 200:
-        # قراءة البيانات وتنظيف أسماء الأعمدة من المسافات
+        # قراءة البيانات وتنظيف أسماء الأعمدة من أي مسافات زائدة
         df = pd.read_csv(StringIO(response.text))
         df.columns = [c.strip() for c in df.columns]
         
         if not df.empty:
             for idx, row in df.iloc[::-1].iterrows():
-                # استخراج البيانات حسب مسميات أعمدتك الـ7 بالضبط
+                # قراءة الأعمدة السبعة التي حددتها
                 c_name = str(row.get('Customer_Name', 'غير معروف'))
                 budget = str(row.get('Budget_Range', 'غير محدد'))
                 region = str(row.get('Target_Region', 'غير محدد'))
@@ -56,7 +56,7 @@ try:
                 phone = str(row.get('Phone_Number', ''))
                 s_date = str(row.get('Submission_Date', ''))
 
-                # تصميم الكارت الاحترافي (اتجاه النص من اليمين للياسمين RTL)
+                # تصميم الكارت الاحترافي (اتجاه النص يمين RTL)
                 st.markdown(f"""
                 <div style="background-color: #1a1c24; border-radius: 15px; padding: 20px; border-right: 5px solid #d4af37; margin-bottom: 20px; direction: rtl; text-align: right;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -75,19 +75,18 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # أزرار التواصل السريع
+                # أزرار الاتصال
                 col1, col2 = st.columns(2)
                 with col1:
-                    # تنظيف رقم الهاتف للواتساب
                     p_clean = re.sub(r'\D', '', phone)
                     st.link_button(f"💬 واتساب مباشر", f"https://wa.me/{p_clean}", use_container_width=True)
                 with col2:
-                    st.link_button(f"📞 اتصال هاتف", f:f"tel:{phone}", use_container_width=True)
+                    st.link_button(f"📞 اتصال هاتف", f"tel:{phone}", use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
         else:
             st.info("الجدول فارغ حالياً في جوجل شيت.")
     else:
-        st.error(f"خطأ {response.status_code}: لم نتمكن من الوصول للجدول. تأكد من إعدادات المشاركة.")
+        st.error(f"خطأ {response.status_code}: تأكد من إعدادات مشاركة الجدول 'Anyone with link'.")
 except Exception as e:
-    st.error(f"حدث خطأ في عرض البيانات: {e}")
+    st.error(f"حدث خطأ تقني: {e}")
     
