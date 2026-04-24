@@ -5,8 +5,8 @@ import requests
 import re
 from io import StringIO
 
-# 1. إعدادات الصفحة واللغة
-st.set_page_config(page_title="عقارات البياع | Pro Data Matrix", layout="wide")
+# 1. إعدادات الصفحة
+st.set_page_config(page_title="عقارات البياع | Matrix Pro", layout="wide")
 
 # --- 🛠️ الإعدادات الثابتة ---
 OFFICE_NAME = "عقارات البياع" 
@@ -15,9 +15,18 @@ SHEET_ID = "1a9MO2P78L7XBggmlkYKYfjnslAAyvGxOeffnv1LT_ac"
 WEBHOOK_URL = "https://eomfdq8l221q30q.m.pipedream.net"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
+# قائمة مناطق بغداد الشاملة [تحديث جديد]
+BAGHDAD_REGIONS = [
+    "البياع", "شهداء البياع", "المنصور", "اليرموك", "السيدية", "الدورة", 
+    "حي الجامعة", "الخضراء", "الغزالية", "العامرية", "حي الجهاد", 
+    "القادسية", "الحارثية", "زيونة", "شارع فلسطين", "الغدير", 
+    "بغداد الجديدة", "الأعظمية", "الصليخ", "القاهرة", "البنوك", 
+    "الشعب", "الكرادة", "الجادرية", "الدباش", "الحرية", "الشعلة", 
+    "الكاظمية", "العطيفية", "الدولعي", "حي العدل", "أخرى"
+]
+
 # التحقق من نوع الواجهة
-query_params = st.query_params
-is_client = query_params.get("view") == "client"
+is_client = st.query_params.get("view") == "client"
 
 # --- 📊 دالة الترتيب الذكي للميزانية ---
 def get_unified_budget(v):
@@ -32,7 +41,7 @@ def get_unified_budget(v):
         return n
     except: return 0
 
-# --- 📱 واجهة الزبائن ---
+# --- 📱 واجهة الزبائن (الفورم المحدث) ---
 if is_client:
     if "submitted" not in st.session_state: st.session_state.submitted = False
     if not st.session_state.submitted:
@@ -41,9 +50,10 @@ if is_client:
             st.markdown("### سجل طلبك العقاري")
             name = st.text_input("الأسم الكامل")
             phone = st.text_input("رقم الهاتف (واتساب)")
-            region = st.selectbox("المنطقة المطلوبة", ["البياع", "شهداء البياع", "السيدية", "أخرى"])
+            # القائمة المنسدلة الشاملة هنا
+            region = st.selectbox("اختر المنطقة المطلوبة في بغداد", BAGHDAD_REGIONS)
             budget = st.text_input("الميزانية التقريبية")
-            details = st.text_area("تفاصيل العقار")
+            details = st.text_area("تفاصيل العقار المطلوبة")
             if st.form_submit_button("إرسال الطلب الآن 🚀"):
                 if name and phone:
                     requests.post(WEBHOOK_URL, params={"name":name,"phone":phone,"region":region,"budget":budget,"details":details,"source":OFFICE_NAME}, timeout=5)
@@ -51,7 +61,7 @@ if is_client:
                 else: st.warning("يرجى ملء الاسم ورقم الهاتف.")
     else:
         st.balloons()
-        st.markdown(f"<div style='text-align: center; padding: 40px; background-color: #1a1c24; border: 2px solid #d4af37; border-radius: 20px;'><h1 style='color: #d4af37;'>✅ تم الإرسال!</h1><p>شكراً لثقتكم بمكتب <b>{OFFICE_NAME}</b>.</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding: 40px; background-color: #1a1c24; border: 2px solid #d4af37; border-radius: 20px;'><h1 style='color: #d4af37;'>✅ تم الإرسال بنجاح!</h1><p>شكراً لثقتكم بمكتب <b>{OFFICE_NAME}</b>.</p></div>", unsafe_allow_html=True)
         if st.button("إرسال طلب جديد"): st.session_state.submitted = False; st.rerun()
     st.stop()
 
@@ -72,6 +82,7 @@ try:
     df.columns = [c.strip() for c in df.columns]
 
     if not df.empty:
+        # الترتيب الزمني المعكوس (الأحدث فوق)
         df['sort_t'] = pd.to_datetime(df['Submission_Date'], dayfirst=True, errors='coerce')
         df['sort_b'] = df['Budget_Range'].apply(get_unified_budget)
         df = df.sort_values(by=['sort_t', 'sort_b'], ascending=[False, False])
@@ -92,16 +103,12 @@ try:
             </div>
             """, unsafe_allow_html=True)
             
-            # --- أزرار الاتصال (واتساب + اتصال هاتفي) ---
-            phone_val = str(row.get('Phone_Number', ''))
-            p_clean = re.sub(r'\D', '', phone_val)
-            
+            p_clean = re.sub(r'\D', '', str(row.get('Phone_Number', '')))
             col1, col2 = st.columns(2)
             with col1:
                 st.link_button(f"💬 واتساب", f"https://wa.me/{p_clean}", use_container_width=True)
             with col2:
-                # زر الاتصال المباشر
-                st.link_button(f"📞 اتصال هاتفي", f"tel:{p_clean}", use_container_width=True)
+                st.link_button(f"📞 اتصال مباشر", f"tel:{p_clean}", use_container_width=True)
             st.markdown("<br>", unsafe_allow_html=True)
     else: st.info("لا توجد بيانات.")
 except Exception as e: st.error(f"خطأ: {e}")
